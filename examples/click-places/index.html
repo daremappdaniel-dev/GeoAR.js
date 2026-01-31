@@ -6,6 +6,12 @@
     <title>GeoAR.js demo</title>
     <script src='https://aframe.io/releases/0.9.2/aframe.min.js'></script>
     <script src='https://raw.githack.com/jeromeetienne/AR.js/master/aframe/build/aframe-ar.min.js'></script>
+    
+    <!-- Load local components to override/extend AR.js functionality -->
+    <script src="../../src/gps-entity-place.js"></script>
+    <script src="../../src/gps-camera.js"></script>
+    <script src="../../src/gps-camera-debug.js"></script>
+
     <script>
         THREEx.ArToolkitContext.baseURL = 'https://raw.githack.com/jeromeetienne/ar.js/master/three.js/'
     </script>
