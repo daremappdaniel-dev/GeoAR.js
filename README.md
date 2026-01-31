@@ -15,3 +15,6 @@ Filtrado de Actualizaciones: El código original de GeoAR.js solía tener una co
 Peso del Renderizado: Renderizar una imagen 2D simple consume muchos menos recursos que un modelo GLTF 3D con luces y sombras. Esto mantiene los FPS (cuadros por segundo) altos y estables, haciendo que la experiencia se sienta más fluida y menos errática.
 
 Probare en el otro con 2d o con filtrado agresivo.
+
+<img width="1920" height="1080" alt="pc" src="https://github.com/user-attachments/assets/5892adc2-a6c7-4a72-8435-344c4a9db0c1" />
+
