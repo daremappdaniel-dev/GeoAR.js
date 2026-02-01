@@ -1,4 +1,4 @@
-# GeoAR.js
+# GeoAR.js | REPO VIEJO DEL 2019 | AHORA SE HACE DE LA MANERA DE https://github.com/AR-js-org/AR.js
 
 Repositorio oficial de Ar.js para geolocalización y renderizado.
 
