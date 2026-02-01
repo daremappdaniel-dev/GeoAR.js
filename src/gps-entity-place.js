@@ -36,14 +36,9 @@ AFRAME.registerComponent('gps-entity-place', {
         return true;
     },
 
-    /**
-     * Update place position
-     * @returns {void}
-     */
     _updatePosition: function () {
         var position = { x: 0, y: 0, z: 0 }
 
-        // update position.x
         var dstCoords = {
             longitude: this.data.longitude,
             latitude: this._cameraGps.originCoords.latitude,
@@ -53,23 +48,17 @@ AFRAME.registerComponent('gps-entity-place', {
         this._positionXDebug = position.x;
         position.x *= this.data.longitude > this._cameraGps.originCoords.longitude ? 1 : -1;
 
-        // update position.z
         var dstCoords = {
             longitude: this._cameraGps.originCoords.longitude,
             latitude: this.data.latitude,
         };
 
         position.z = this._cameraGps.computeDistanceMeters(this._cameraGps.originCoords, dstCoords, true);
-		position.z *= this.data.latitude > this._cameraGps.originCoords.latitude ? -1 : 1;
+        position.z *= this.data.latitude > this._cameraGps.originCoords.latitude ? -1 : 1;
 
-        // update element's position in 3D world
         this.el.setAttribute('position', position);
     },
 
-    /**
-     * Set places distances from user on debug UI
-     * @returns {void}
-     */
     setDebugData: function (element) {
         const elements = document.querySelectorAll('.debug-distance');
         elements.forEach((el) => {
@@ -79,13 +68,6 @@ AFRAME.registerComponent('gps-entity-place', {
             }
         });
     },
-});
-
-/**
- * Format distances string
- *
- * @param {String} distance
- */
 function formatDistance(distance) {
     distance = distance.toFixed(0);
 

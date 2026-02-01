@@ -27,13 +27,10 @@ AFRAME.registerComponent('gps-camera', {
 
         this.lookControls = this.el.components['look-controls'];
 
-        // listen to deviceorientation event
         var eventName = this._getDeviceOrientationEventName();
         this._onDeviceOrientation = this._onDeviceOrientation.bind(this);
 
-        // if Safari
         if (!!navigator.userAgent.match(/Version\/[\d.]+.*Safari/)) {
-            // iOS 13+
             if (typeof DeviceOrientationEvent.requestPermission === 'function') {
                 var handler = function() {
                     console.log('Requesting device orientation permissions...')
@@ -80,214 +77,152 @@ AFRAME.registerComponent('gps-camera', {
     },
 
     /**
-     * Get device orientation event name, depends on browser implementation.
-     * @returns {string} event name
-     */
-    _getDeviceOrientationEventName: function () {
-        if ('ondeviceorientationabsolute' in window) {
-            var eventName = 'deviceorientationabsolute'
-        } else if ('ondeviceorientation' in window) {
-            var eventName = 'deviceorientation'
-        } else {
-            var eventName = ''
-            console.error('Compass not supported')
-        }
+            _getDeviceOrientationEventName: function () {
+            _getDeviceOrientationEventName: function () {
+                if ('ondeviceorientationabsolute' in window) {
+                    var eventName = 'deviceorientationabsolute'
+                } else if ('ondeviceorientation' in window) {
+                    var eventName = 'deviceorientation'
+                } else {
+                    var eventName = ''
+                    console.error('Compass not supported')
+                }
 
-        return eventName
-    },
+                return eventName
+            },
 
-    /**
-     * Get current user position.
-     *
-     * @param {function} onSuccess
-     * @param {function} onError
-     * @returns {Promise}
-     */
-    _initWatchGPS: function (onSuccess, onError) {
-        if (!onError) {
-            onError = function (err) {
-                console.warn('ERROR(' + err.code + '): ' + err.message)
+            _initWatchGPS: function (onSuccess, onError) {
+                if (!onError) {
+                    onError = function (err) {
+                        console.warn('ERROR(' + err.code + '): ' + err.message)
 
-                if (err.code === 1) {
-                    // User denied GeoLocation, let their know that
-                    alert('Please activate Geolocation and refresh the page. If it is already active, please check permissions for this website.');
+                        if (err.code === 1) {
+                            alert('Please activate Geolocation and refresh the page. If it is already active, please check permissions for this website.');
+                            return;
+                        }
+
+                        if (err.code === 3) {
+                            alert('Cannot retrieve GPS position. Signal is absent.');
+                            return;
+                        }
+                    };
+                }
+
+                if ('geolocation' in navigator === false) {
+                    onError({ code: 0, message: 'Geolocation is not supported by your browser' });
+                    return Promise.resolve();
+                }
+
+                return navigator.geolocation.watchPosition(onSuccess, onError, {
+                    enableHighAccuracy: true,
+                    maximumAge: 0,
+                    timeout: 27000,
+                });
+            },
+
+            _updatePosition: function () {
+                if (this.currentCoords.accuracy > this.data.positionMinAccuracy) {
+                    if (this.data.alert && !document.getElementById('alert-popup')) {
+                        var popup = document.createElement('div');
+                        popup.innerHTML = 'GPS signal is very poor. Try move outdoor or to an area with a better signal.'
+                        popup.setAttribute('id', 'alert-popup');
+                        document.body.appendChild(popup);
+                    }
                     return;
                 }
 
-                if (err.code === 3) {
-                    alert('Cannot retrieve GPS position. Signal is absent.');
-                    return;
+                var alertPopup = document.getElementById('alert-popup');
+                if (this.currentCoords.accuracy <= this.data.positionMinAccuracy && alertPopup) {
+                    document.body.removeChild(alertPopup);
                 }
-            };
-        }
 
-        if ('geolocation' in navigator === false) {
-            onError({ code: 0, message: 'Geolocation is not supported by your browser' });
-            return Promise.resolve();
-        }
+                if (!this.originCoords) {
+                    this.originCoords = this.currentCoords;
+                }
 
-        // https://developer.mozilla.org/en-US/docs/Web/API/Geolocation/watchPosition
-        return navigator.geolocation.watchPosition(onSuccess, onError, {
-            enableHighAccuracy: true,
-            maximumAge: 0,
-            timeout: 27000,
-        });
-    },
+                var position = this.el.getAttribute('position');
 
-    /**
-     * Update user position.
-     *
-     * @returns {void}
-     */
-    _updatePosition: function () {
-        // don't update if accuracy is not good enough
-        if (this.currentCoords.accuracy > this.data.positionMinAccuracy) {
-            if (this.data.alert && !document.getElementById('alert-popup')) {
-                var popup = document.createElement('div');
-                popup.innerHTML = 'GPS signal is very poor. Try move outdoor or to an area with a better signal.'
-                popup.setAttribute('id', 'alert-popup');
-                document.body.appendChild(popup);
-            }
-            return;
-        }
+                var dstCoords = {
+                    longitude: this.currentCoords.longitude,
+                    latitude: this.originCoords.latitude,
+                };
+                position.x = this.computeDistanceMeters(this.originCoords, dstCoords);
+                position.x *= this.currentCoords.longitude > this.originCoords.longitude ? 1 : -1;
 
-        var alertPopup = document.getElementById('alert-popup');
-        if (this.currentCoords.accuracy <= this.data.positionMinAccuracy && alertPopup) {
-            document.body.removeChild(alertPopup);
-        }
+                var dstCoords = {
+                    longitude: this.originCoords.longitude,
+                    latitude: this.currentCoords.latitude,
+                }
+                position.z = this.computeDistanceMeters(this.originCoords, dstCoords);
+                position.z *= this.currentCoords.latitude > this.originCoords.latitude ? -1 : 1;
 
-        if (!this.originCoords) {
-            this.originCoords = this.currentCoords;
-        }
+                this.el.setAttribute('position', position);
+            },
 
-        var position = this.el.getAttribute('position');
+            computeDistanceMeters: function (src, dest, isPlace) {
+                var dlongitude = THREE.Math.degToRad(dest.longitude - src.longitude);
+                var dlatitude = THREE.Math.degToRad(dest.latitude - src.latitude);
 
-        // compute position.x
-        var dstCoords = {
-            longitude: this.currentCoords.longitude,
-            latitude: this.originCoords.latitude,
-        };
-        position.x = this.computeDistanceMeters(this.originCoords, dstCoords);
-        position.x *= this.currentCoords.longitude > this.originCoords.longitude ? 1 : -1;
+                var a = (Math.sin(dlatitude / 2) * Math.sin(dlatitude / 2)) + Math.cos(THREE.Math.degToRad(src.latitude)) * Math.cos(THREE.Math.degToRad(dest.latitude)) * (Math.sin(dlongitude / 2) * Math.sin(dlongitude / 2));
+                var angle = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                var distance = angle * 6378160;
 
-        // compute position.z
-        var dstCoords = {
-            longitude: this.originCoords.longitude,
-            latitude: this.currentCoords.latitude,
-        }
-        position.z = this.computeDistanceMeters(this.originCoords, dstCoords);
-        position.z *= this.currentCoords.latitude > this.originCoords.latitude ? -1 : 1;
+                if (isPlace && this.data.minDistance && this.data.minDistance > 0 && distance < this.data.minDistance) {
+                    return Number.MAX_SAFE_INTEGER;
+                }
 
-        // update position
-        this.el.setAttribute('position', position);
-    },
+                return distance;
+            },
 
-    /**
-     * Returns distance in meters between source and destination inputs.
-     *
-     *  Calculate distance, bearing and more between Latitude/Longitude points
-     *  Details: https://www.movable-type.co.uk/scripts/latlong.html
-     *
-     * @param {Position} src
-     * @param {Position} dest
-     * @param {Boolean} isPlace
-     *
-     * @returns {number} distance
-     */
-    computeDistanceMeters: function (src, dest, isPlace) {
-        var dlongitude = THREE.Math.degToRad(dest.longitude - src.longitude);
-        var dlatitude = THREE.Math.degToRad(dest.latitude - src.latitude);
+            _computeCompassHeading: function (alpha, beta, gamma) {
+                var alphaRad = alpha * (Math.PI / 180);
+                var betaRad = beta * (Math.PI / 180);
+                var gammaRad = gamma * (Math.PI / 180);
 
-        var a = (Math.sin(dlatitude / 2) * Math.sin(dlatitude / 2)) + Math.cos(THREE.Math.degToRad(src.latitude)) * Math.cos(THREE.Math.degToRad(dest.latitude)) * (Math.sin(dlongitude / 2) * Math.sin(dlongitude / 2));
-        var angle = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        var distance = angle * 6378160;
+                var cA = Math.cos(alphaRad);
+                var sA = Math.sin(alphaRad);
+                var sB = Math.sin(betaRad);
+                var cG = Math.cos(gammaRad);
+                var sG = Math.sin(gammaRad);
 
-        // if function has been called for a place, and if it's too near and a min distance has been set,
-        // set a very high distance to hide the object
-        if (isPlace && this.data.minDistance && this.data.minDistance > 0 && distance < this.data.minDistance) {
-            return Number.MAX_SAFE_INTEGER;
-        }
+                var rA = - cA * sG - sA * sB * cG;
+                var rB = - sA * sG + cA * sB * cG;
 
-        return distance;
-    },
+                var compassHeading = Math.atan(rA / rB);
 
-    /**
-     * Compute compass heading.
-     *
-     * @param {number} alpha
-     * @param {number} beta
-     * @param {number} gamma
-     *
-     * @returns {number} compass heading
-     */
-    _computeCompassHeading: function (alpha, beta, gamma) {
+                if (rB < 0) {
+                    compassHeading += Math.PI;
+                } else if (rA < 0) {
+                    compassHeading += 2 * Math.PI;
+                }
 
-        // Convert degrees to radians
-        var alphaRad = alpha * (Math.PI / 180);
-        var betaRad = beta * (Math.PI / 180);
-        var gammaRad = gamma * (Math.PI / 180);
+                compassHeading *= 180 / Math.PI;
 
-        // Calculate equation components
-        var cA = Math.cos(alphaRad);
-        var sA = Math.sin(alphaRad);
-        var sB = Math.sin(betaRad);
-        var cG = Math.cos(gammaRad);
-        var sG = Math.sin(gammaRad);
+                return compassHeading;
+            },
 
-        // Calculate A, B, C rotation components
-        var rA = - cA * sG - sA * sB * cG;
-        var rB = - sA * sG + cA * sB * cG;
+            _onDeviceOrientation: function (event) {
+                if (event.webkitCompassHeading !== undefined) {
+                    if (event.webkitCompassAccuracy < 50) {
+                        this.heading = event.webkitCompassHeading;
+                    } else {
+                        console.warn('webkitCompassAccuracy is event.webkitCompassAccuracy');
+                    }
+                } else if (event.alpha !== null) {
+                    if (event.absolute === true || event.absolute === undefined) {
+                        this.heading = this._computeCompassHeading(event.alpha, event.beta, event.gamma);
+                    } else {
+                        console.warn('event.absolute === false');
+                    }
+                } else {
+                    console.warn('event.alpha === null');
+                }
+            },
 
-        // Calculate compass heading
-        var compassHeading = Math.atan(rA / rB);
-
-        // Convert from half unit circle to whole unit circle
-        if (rB < 0) {
-            compassHeading += Math.PI;
-        } else if (rA < 0) {
-            compassHeading += 2 * Math.PI;
-        }
-
-        // Convert radians to degrees
-        compassHeading *= 180 / Math.PI;
-
-        return compassHeading;
-    },
-
-    /**
-     * Handler for device orientation event.
-     *
-     * @param {Event} event
-     * @returns {void}
-     */
-    _onDeviceOrientation: function (event) {
-        if (event.webkitCompassHeading !== undefined) {
-            if (event.webkitCompassAccuracy < 50) {
-                this.heading = event.webkitCompassHeading;
-            } else {
-                console.warn('webkitCompassAccuracy is event.webkitCompassAccuracy');
-            }
-        } else if (event.alpha !== null) {
-            if (event.absolute === true || event.absolute === undefined) {
-                this.heading = this._computeCompassHeading(event.alpha, event.beta, event.gamma);
-            } else {
-                console.warn('event.absolute === false');
-            }
-        } else {
-            console.warn('event.alpha === null');
-        }
-    },
-
-    /**
-     * Update user rotation data.
-     *
-     * @returns {void}
-     */
-    _updateRotation: function () {
-        var heading = 360 - this.heading;
-        var cameraRotation = this.el.getAttribute('rotation').y;
-        var yawRotation = THREE.Math.radToDeg(this.lookControls.yawObject.rotation.y);
-        var offset = (heading - (cameraRotation - yawRotation)) % 360;
-        this.lookControls.yawObject.rotation.y = THREE.Math.degToRad(offset);
-    },
-});
+            _updateRotation: function () {
+                var heading = 360 - this.heading;
+                var cameraRotation = this.el.getAttribute('rotation').y;
+                var yawRotation = THREE.Math.radToDeg(this.lookControls.yawObject.rotation.y);
+                var offset = (heading - (cameraRotation - yawRotation)) % 360;
+                this.lookControls.yawObject.rotation.y = THREE.Math.degToRad(offset);
+            },

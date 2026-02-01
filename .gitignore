@@ -1,3 +1,8 @@
 node_modules/
 .secrets
 docs/*.gif
+
+# Local configuration
+config.js
+Examples/**/config.js
+examples/**/config.js
